@@ -11,6 +11,7 @@ interface User {
 interface AuthContextType {
   user: User | null
   loading: boolean
+  isAuthenticated: boolean
   login: (email: string, password: string) => Promise<void>
   logout: () => void
 }
@@ -45,10 +46,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const response = await loginUser(email, password)
       const { token, user: userData } = response
       
+      console.log('Login successful:', { token: token ? 'Present' : 'Missing', user: userData })
+      
       localStorage.setItem('token', token)
       localStorage.setItem('user', JSON.stringify(userData))
       setUser(userData)
     } catch (error) {
+      console.error('Login error:', error)
       throw error
     }
   }
@@ -60,7 +64,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout }}>
+    <AuthContext.Provider value={{ 
+      user, 
+      loading, 
+      isAuthenticated: !!user, 
+      login, 
+      logout 
+    }}>
       {children}
     </AuthContext.Provider>
   )

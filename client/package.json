@@ -13,7 +13,10 @@
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-router-dom": "^6.20.1",
-    "react-big-calendar": "^1.8.6",
+    "@fullcalendar/react": "^6.1.10",
+    "@fullcalendar/daygrid": "^6.1.10",
+    "@fullcalendar/timegrid": "^6.1.10",
+    "@fullcalendar/interaction": "^6.1.10",
     "react-hook-form": "^7.48.2",
     "react-query": "^3.39.3",
     "react-hot-toast": "^2.4.1",
@@ -25,7 +28,7 @@
   "devDependencies": {
     "@types/react": "^18.2.37",
     "@types/react-dom": "^18.2.15",
-    "@types/react-big-calendar": "^1.8.8",
+
     "@typescript-eslint/eslint-plugin": "^6.10.0",
     "@typescript-eslint/parser": "^6.10.0",
     "@vitejs/plugin-react": "^4.1.1",

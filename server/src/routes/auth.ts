@@ -27,9 +27,15 @@ router.post('/login',
         return res.status(401).json({ error: 'Invalid credentials' });
       }
 
-      // For demo purposes, we'll use a simple password check
-      // In production, you should hash passwords
-      const isValidPassword = password === 'admin123' || await bcrypt.compare(password, user.password || '');
+      // Demo credentials check - admin@example.com with password admin123
+      let isValidPassword = false;
+      
+      if (email === 'admin@example.com' && password === 'admin123') {
+        isValidPassword = true;
+      } else if (user.password) {
+        // If user has a password field, check against hashed password
+        isValidPassword = await bcrypt.compare(password, user.password);
+      }
 
       if (!isValidPassword) {
         return res.status(401).json({ error: 'Invalid credentials' });

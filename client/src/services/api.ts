@@ -13,6 +13,8 @@ async function apiRequest<T>(
 ): Promise<T> {
   const token = getAuthToken()
   
+  console.log('API Request:', { endpoint, token: token ? 'Present' : 'Missing' })
+  
   const config: RequestInit = {
     headers: {
       'Content-Type': 'application/json',
@@ -41,11 +43,33 @@ export const api = {
       body: JSON.stringify(data),
     }),
   
+  postFormData: <T>(endpoint: string, data: FormData) => {
+    const token = getAuthToken()
+    return apiRequest<T>(endpoint, {
+      method: 'POST',
+      body: data,
+      headers: {
+        ...(token && { Authorization: `Bearer ${token}` }),
+      },
+    })
+  },
+  
   put: <T>(endpoint: string, data: any) =>
     apiRequest<T>(endpoint, {
       method: 'PUT',
       body: JSON.stringify(data),
     }),
+  
+  putFormData: <T>(endpoint: string, data: FormData) => {
+    const token = getAuthToken()
+    return apiRequest<T>(endpoint, {
+      method: 'PUT',
+      body: data,
+      headers: {
+        ...(token && { Authorization: `Bearer ${token}` }),
+      },
+    })
+  },
   
   delete: <T>(endpoint: string) =>
     apiRequest<T>(endpoint, {

@@ -1,26 +1,14 @@
 import { useState, useCallback } from 'react'
-import { Calendar as BigCalendar, dateFnsLocalizer } from 'react-big-calendar'
-import { format, parse, startOfWeek, getDay } from 'date-fns'
+import FullCalendar from '@fullcalendar/react'
+import dayGridPlugin from '@fullcalendar/daygrid'
+import timeGridPlugin from '@fullcalendar/timegrid'
+import interactionPlugin from '@fullcalendar/interaction'
 import { useQuery, useMutation, useQueryClient } from 'react-query'
 import { toast } from 'react-hot-toast'
 import { Plus, Edit, Trash2 } from 'lucide-react'
 import { api } from '../services/api'
 import BookingModal from '../components/BookingModal'
 import LoadingSpinner from '../components/LoadingSpinner'
-
-import enUS from 'date-fns/locale/en-US'
-
-const locales = {
-  'en-US': enUS,
-}
-
-const localizer = dateFnsLocalizer({
-  format,
-  parse,
-  startOfWeek,
-  getDay,
-  locales,
-})
 
 interface Booking {
   id: string
@@ -81,11 +69,22 @@ export default function Calendar() {
     setIsModalOpen(true)
   }, [])
 
-  const handleSelectSlot = useCallback((slotInfo: any) => {
+  const handleSelectSlot = useCallback((selectInfo: any) => {
     setSelectedBooking(null)
     setIsCreating(true)
     setIsModalOpen(true)
   }, [])
+
+  const renderEventContent = (eventInfo: any) => {
+    return (
+      <div className="p-1 text-xs">
+        <div className="font-semibold">{eventInfo.event.title}</div>
+        <div className="text-xs opacity-75">
+          {eventInfo.timeText}
+        </div>
+      </div>
+    )
+  }
 
   const handleCloseModal = () => {
     setIsModalOpen(false)
@@ -99,37 +98,7 @@ export default function Calendar() {
     }
   }
 
-  const eventStyleGetter = (event: Booking) => {
-    let backgroundColor = '#3b82f6' // default blue
-    
-    switch (event.status) {
-      case 'CONFIRMED':
-        backgroundColor = '#10b981' // green
-        break
-      case 'PENDING':
-        backgroundColor = '#f59e0b' // yellow
-        break
-      case 'CANCELLED':
-        backgroundColor = '#ef4444' // red
-        break
-      case 'COMPLETED':
-        backgroundColor = '#6b7280' // gray
-        break
-      default:
-        backgroundColor = '#3b82f6' // blue
-    }
 
-    return {
-      style: {
-        backgroundColor,
-        borderRadius: '4px',
-        opacity: 0.8,
-        color: 'white',
-        border: '0px',
-        display: 'block',
-      },
-    }
-  }
 
   if (isLoading) {
     return (
@@ -158,22 +127,26 @@ export default function Calendar() {
 
       <div className="card p-6">
         <div className="h-[600px]">
-          <BigCalendar
-            localizer={localizer}
+          <FullCalendar
+            plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
+            headerToolbar={{
+              left: 'prev,next today',
+              center: 'title',
+              right: 'dayGridMonth,timeGridWeek,timeGridDay'
+            }}
+            initialView="timeGridWeek"
+            editable={true}
+            selectable={true}
+            selectMirror={true}
+            dayMaxEvents={true}
+            weekends={true}
             events={bookings}
-            startAccessor="start"
-            endAccessor="end"
-            style={{ height: '100%' }}
-            onSelectEvent={handleSelectEvent}
-            onSelectSlot={handleSelectSlot}
-            selectable
-            eventPropGetter={eventStyleGetter}
-            views={['month', 'week', 'day']}
-            defaultView="week"
-            step={15}
-            timeslots={4}
-            min={new Date(0, 0, 0, 8, 0, 0)} // 8 AM
-            max={new Date(0, 0, 0, 18, 0, 0)} // 6 PM
+            select={handleSelectSlot}
+            eventClick={handleSelectEvent}
+            eventContent={renderEventContent}
+            height="100%"
+            slotMinTime="08:00:00"
+            slotMaxTime="18:00:00"
           />
         </div>
       </div>

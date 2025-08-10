@@ -28,7 +28,9 @@ export async function loginUser(email: string, password: string): Promise<LoginR
 }
 
 export function getAuthToken(): string | null {
-  return localStorage.getItem('token')
+  const token = localStorage.getItem('token')
+  console.log('Getting auth token:', token ? 'Present' : 'Missing')
+  return token
 }
 
 export function setAuthToken(token: string): void {

@@ -15,6 +15,7 @@ model User {
   email     String   @unique
   name      String
   phone     String?
+  password  String?  // Optional password field for hashed passwords
   role      UserRole @default(USER)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -39,6 +40,19 @@ model Service {
   bookings BookingsOnServices[]
 
   @@map("services")
+}
+
+model Staff {
+  id        Int      @id @default(autoincrement())
+  name      String
+  staffId   String   @unique // Staff ID field (user input)
+  pictures  String[] // Multiple picture file paths for staff photos
+  status    String   @default("active") // Status: active or inactive
+  remarks   String?  // Optional remarks field
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("staff")
 }
 
 model Booking {
