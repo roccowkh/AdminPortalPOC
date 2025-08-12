@@ -1,6 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -11,62 +8,57 @@ datasource db {
 }
 
 model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  name      String
-  phone     String?
-  password  String?  // Optional password field for hashed passwords
-  role      UserRole @default(USER)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // Relations
-  bookings BookingsOnUsers[]
+  id           String            @id @default(cuid())
+  email        String            @unique
+  name         String
+  phone        String?
+  role         UserRole          @default(USER)
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+  password     String?
+  refreshToken String?
+  bookings     BookingsOnUsers[]
 
   @@map("users")
 }
 
 model Service {
-  id          String   @id @default(cuid())
+  id          String               @id @default(cuid())
   name        String
   description String?
-  duration    Int      // Duration in minutes
+  duration    Int
   price       Float?
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  // Relations
-  bookings BookingsOnServices[]
+  isActive    Boolean              @default(true)
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
+  bookings    BookingsOnServices[]
 
   @@map("services")
 }
 
 model Staff {
-  id        Int      @id @default(autoincrement())
   name      String
-  staffId   String   @unique // Staff ID field (user input)
-  pictures  String[] // Multiple picture file paths for staff photos
-  status    String   @default("active") // Status: active or inactive
-  remarks   String?  // Optional remarks field
+  staffId   String   @unique
+  remarks   String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  id        Int      @id @default(autoincrement())
+  pictures  String[]
+  status    String   @default("active")
 
   @@map("staff")
 }
 
 model Booking {
-  id          String        @id @default(cuid())
-  startTime   DateTime
-  endTime     DateTime
-  status      BookingStatus @default(CONFIRMED)
-  notes       String?
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
-
-  // Relations
-  users    BookingsOnUsers[]
-  services BookingsOnServices[]
+  id        String               @id @default(cuid())
+  startTime DateTime
+  endTime   DateTime
+  status    BookingStatus        @default(CONFIRMED)
+  notes     String?
+  createdAt DateTime             @default(now())
+  updatedAt DateTime             @updatedAt
+  services  BookingsOnServices[]
+  users     BookingsOnUsers[]
 
   @@map("bookings")
 }
@@ -76,10 +68,8 @@ model BookingsOnUsers {
   bookingId String
   userId    String
   createdAt DateTime @default(now())
-
-  // Relations
-  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
-  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  booking   Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([bookingId, userId])
   @@map("bookings_on_users")
@@ -90,10 +80,8 @@ model BookingsOnServices {
   bookingId String
   serviceId String
   createdAt DateTime @default(now())
-
-  // Relations
-  booking Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
-  service Service  @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  booking   Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  service   Service  @relation(fields: [serviceId], references: [id], onDelete: Cascade)
 
   @@unique([bookingId, serviceId])
   @@map("bookings_on_services")
@@ -110,4 +98,4 @@ enum BookingStatus {
   CANCELLED
   COMPLETED
   NO_SHOW
-} 
+}

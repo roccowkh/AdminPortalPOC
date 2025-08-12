@@ -1,4 +1,4 @@
-import { getAuthToken } from './auth'
+import { getAuthToken, getRefreshToken, setAuthToken, removeAllTokens } from './auth'
 
 const API_BASE_URL = '/api'
 
@@ -24,7 +24,58 @@ async function apiRequest<T>(
     ...options,
   }
 
-  const response = await fetch(`${API_BASE_URL}${endpoint}`, config)
+  let response = await fetch(`${API_BASE_URL}${endpoint}`, config)
+
+  // If token is expired, try to refresh it and retry the request
+  if (response.status === 403) {
+    const errorData = await response.json().catch(() => ({}))
+    
+    if (errorData.error === 'Invalid or expired token') {
+      console.log('Token expired, attempting to refresh...')
+      
+      try {
+        const refreshTokenValue = getRefreshToken()
+        if (!refreshTokenValue) {
+          throw new Error('No refresh token available')
+        }
+
+        const refreshResponse = await fetch(`${API_BASE_URL}/auth/refresh`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ refreshToken: refreshTokenValue }),
+        })
+
+        if (refreshResponse.ok) {
+          const refreshData = await refreshResponse.json()
+          
+          // Update stored token
+          setAuthToken(refreshData.token)
+          
+          // Retry the original request with new token
+          const newConfig: RequestInit = {
+            ...config,
+            headers: {
+              ...config.headers,
+              Authorization: `Bearer ${refreshData.token}`,
+            },
+          }
+          
+          response = await fetch(`${API_BASE_URL}${endpoint}`, newConfig)
+          console.log('Request retried with refreshed token')
+        } else {
+          throw new Error('Token refresh failed')
+        }
+      } catch (error) {
+        console.error('Token refresh failed:', error)
+        // Clear all tokens and redirect to login
+        removeAllTokens()
+        window.location.href = '/'
+        throw new Error('Authentication failed. Please login again.')
+      }
+    }
+  }
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({ error: 'Network error' }))

@@ -46,7 +46,7 @@ const upload = multer({
 // Get all staff members
 router.get('/', 
   authenticateToken,
-  async (req, res) => {
+  async (req: express.Request, res: express.Response) => {
     try {
       const { search } = req.query;
       
@@ -90,7 +90,7 @@ router.get('/:id',
   authenticateToken,
   [param('id').isInt()],
   validateRequest,
-  async (req, res) => {
+  async (req: express.Request, res: express.Response) => {
     try {
       const { id } = req.params;
       
@@ -132,7 +132,7 @@ router.post('/',
     body('remarks').optional().isString(),
   ],
   validateRequest,
-  async (req, res) => {
+  async (req: express.Request, res: express.Response) => {
     try {
       const { name, staffId, status, remarks } = req.body;
       const pictures = req.files ? (req.files as Express.Multer.File[]).map(file => `/uploads/staff/${file.filename}`) : [];
@@ -186,7 +186,7 @@ router.put('/:id',
     body('remarks').optional().isString(),
   ],
   validateRequest,
-  async (req, res) => {
+  async (req: express.Request, res: express.Response) => {
     try {
       const { id } = req.params;
       const { name, staffId, status, remarks } = req.body;
@@ -224,6 +224,33 @@ router.put('/:id',
         pictures = newPictures;
       }
 
+      // Handle picture removal
+      let picturesToRemove: string[] = [];
+      if (req.body.picturesToRemove) {
+        try {
+          picturesToRemove = JSON.parse(req.body.picturesToRemove);
+        } catch (error) {
+          console.error('Error parsing picturesToRemove:', error);
+        }
+      }
+
+      // Remove specified pictures and delete their files
+      if (picturesToRemove.length > 0) {
+        for (const pictureToRemove of picturesToRemove) {
+          const picturePath = path.join(__dirname, '..', pictureToRemove);
+          if (fs.existsSync(picturePath)) {
+            fs.unlinkSync(picturePath);
+          }
+        }
+        // Filter out removed pictures from the existing pictures array
+        pictures = pictures.filter(picture => !picturesToRemove.includes(picture));
+      }
+
+      // If new pictures were uploaded, add them to the existing ones (instead of replacing)
+      if (newPictures !== undefined && newPictures.length > 0) {
+        pictures = [...pictures, ...newPictures];
+      }
+
       const staffMember = await prisma.staff.update({
         where: { id: parseInt(id) },
         data: {
@@ -259,7 +286,7 @@ router.delete('/:id',
   requireAdmin,
   [param('id').isInt()],
   validateRequest,
-  async (req, res) => {
+  async (req: express.Request, res: express.Response) => {
     try {
       const { id } = req.params;
       
@@ -287,6 +314,45 @@ router.delete('/:id',
     } catch (error) {
       console.error('Error deleting staff member:', error);
       res.status(500).json({ error: 'Failed to delete staff member' });
+    }
+  }
+);
+
+// Bulk update staff status
+router.put('/bulk-status', 
+  authenticateToken,
+  requireAdmin,
+  [
+    body('ids').isArray().withMessage('IDs must be an array'),
+    body('status').isIn(['active', 'inactive']).withMessage('Status must be active or inactive'),
+  ],
+  validateRequest,
+  async (req: express.Request, res: express.Response) => {
+    try {
+      const { ids, status } = req.body;
+      
+      if (!Array.isArray(ids) || ids.length === 0) {
+        return res.status(400).json({ error: 'IDs array is required and must not be empty' });
+      }
+
+      const updatedStaff = await prisma.staff.updateMany({
+        where: {
+          id: {
+            in: ids.map((id: any) => parseInt(id))
+          }
+        },
+        data: {
+          status
+        }
+      });
+
+      res.json({ 
+        message: `Updated ${updatedStaff.count} staff member(s) to ${status}`,
+        count: updatedStaff.count 
+      });
+    } catch (error) {
+      console.error('Error updating staff status:', error);
+      res.status(500).json({ error: 'Failed to update staff status' });
     }
   }
 );

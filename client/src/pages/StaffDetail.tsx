@@ -31,6 +31,7 @@ export default function StaffDetail() {
   const queryClient = useQueryClient()
   const [isEditing, setIsEditing] = useState(false)
   const [newPictures, setNewPictures] = useState<File[]>([])
+  const [picturesToRemove, setPicturesToRemove] = useState<string[]>([])
 
   const { register, handleSubmit, setValue, formState: { errors }, reset, watch } = useForm<StaffForm>()
 
@@ -62,6 +63,7 @@ export default function StaffDetail() {
         toast.success('Staff member updated successfully!')
         setIsEditing(false)
         setNewPictures([])
+        setPicturesToRemove([]) // Reset pictures to remove after successful update
         // Reset form with updated data
         if (staff) {
           reset({
@@ -111,6 +113,7 @@ export default function StaffDetail() {
   const handleCancel = () => {
     setIsEditing(false)
     setNewPictures([])
+    setPicturesToRemove([])
     // Reset form to original values
     if (staff) {
       reset({
@@ -127,15 +130,18 @@ export default function StaffDetail() {
     formData.append('name', data.name)
     formData.append('staffId', data.staffId)
     formData.append('status', data.status)
-    if (data.remarks) formData.append('remarks', data.remarks)
+    formData.append('remarks', data.remarks)
     
-    // Add new pictures if any
-    if (newPictures.length > 0) {
-      newPictures.forEach(file => {
-        formData.append('pictures', file)
-      })
+    // Add new pictures
+    newPictures.forEach((file) => {
+      formData.append('pictures', file)
+    })
+    
+    // Add pictures to remove
+    if (picturesToRemove.length > 0) {
+      formData.append('picturesToRemove', JSON.stringify(picturesToRemove))
     }
-
+    
     updateMutation.mutate({ staffData: formData })
   }
 
@@ -146,6 +152,14 @@ export default function StaffDetail() {
 
   const removeNewPicture = (index: number) => {
     setNewPictures(prev => prev.filter((_, i) => i !== index))
+  }
+
+  const removeExistingPicture = (picturePath: string) => {
+    setPicturesToRemove(prev => [...prev, picturePath])
+  }
+
+  const undoRemovePicture = (picturePath: string) => {
+    setPicturesToRemove(prev => prev.filter(p => p !== picturePath))
   }
 
   if (isLoading) return <LoadingSpinner />
@@ -309,7 +323,14 @@ export default function StaffDetail() {
           {/* Pictures Section */}
           <div className="card p-6">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-semibold">Pictures</h2>
+              <h2 className="text-xl font-semibold">
+                Pictures
+                {isEditing && picturesToRemove.length > 0 && (
+                  <span className="ml-2 text-sm text-red-600 bg-red-100 px-2 py-1 rounded-full">
+                    {picturesToRemove.length} to remove
+                  </span>
+                )}
+              </h2>
               {isEditing && (
                 <label className="inline-flex items-center px-3 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-200 shadow-sm cursor-pointer">
                   <Upload className="h-4 w-4 mr-2" />
@@ -354,44 +375,85 @@ export default function StaffDetail() {
               <h3 className="text-sm font-medium text-gray-700 mb-2">Current Pictures:</h3>
               {staff.pictures && staff.pictures.length > 0 ? (
                 <div className="grid grid-cols-4 gap-2">
-                  {staff.pictures.map((picture, index) => {
-                    // Use utility function to construct full image URL
-                    const fullImageUrl = getImageUrl(picture)
-                    
-                    console.log('Picture data:', { 
-                      picture, 
-                      fullImageUrl, 
-                      index,
-                      staffName: staff.name,
-                      backendUrl: 'http://localhost:5001'
-                    })
-                    
-                    return (
-                      <div key={index} className="relative">
-                        <img
-                          src={fullImageUrl}
-                          alt={`${staff.name} ${index + 1}`}
-                          className="h-20 w-20 object-cover rounded border"
-                          onError={(e) => {
-                            console.error('Image failed to load:', fullImageUrl)
-                            console.error('Error details:', e)
-                            // Replace with a placeholder when image fails to load
-                            e.currentTarget.src = `data:image/svg+xml;base64,${btoa(`
-                              <svg width="80" height="80" xmlns="http://www.w3.org/2000/svg">
-                                <rect width="80" height="80" fill="#f3f4f6"/>
-                                <text x="40" y="45" font-family="Arial" font-size="12" text-anchor="middle" fill="#9ca3af">
-                                  ${staff.name} ${index + 1}
-                                </text>
-                              </svg>
-                            `)}`
-                          }}
-                        />
-                      </div>
-                    )
-                  })}
+                  {staff.pictures
+                    .filter(picture => !picturesToRemove.includes(picture))
+                    .map((picture, index) => {
+                      // Use utility function to construct full image URL
+                      const fullImageUrl = getImageUrl(picture)
+                      
+                      console.log('Picture data:', { 
+                        picture, 
+                        fullImageUrl, 
+                        index,
+                        staffName: staff.name,
+                        backendUrl: 'http://localhost:5001'
+                      })
+                      
+                      return (
+                        <div key={index} className="relative">
+                          <img
+                            src={fullImageUrl}
+                            alt={`${staff.name} ${index + 1}`}
+                            className="h-20 w-20 object-cover rounded border"
+                            onError={(e) => {
+                              console.error('Image failed to load:', fullImageUrl)
+                              console.error('Error details:', e)
+                              // Replace with a placeholder when image fails to load
+                              e.currentTarget.src = `data:image/svg+xml;base64,${btoa(`
+                                <svg width="80" height="80" xmlns="http://www.w3.org/2000/svg">
+                                  <rect width="80" height="80" fill="#f3f4f6"/>
+                                  <text x="40" y="45" font-family="Arial" font-size="12" text-anchor="middle" fill="#9ca3af">
+                                    ${staff.name} ${index + 1}
+                                  </text>
+                                </svg>
+                              `)}`
+                            }}
+                          />
+                          {isEditing && (
+                            <button
+                              onClick={() => removeExistingPicture(picture)}
+                              className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600 transition-colors duration-200"
+                              title="Remove picture"
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </button>
+                          )}
+                        </div>
+                      )
+                    })}
                 </div>
               ) : (
                 <p className="text-gray-500">No pictures uploaded yet.</p>
+              )}
+              
+              {/* Show removed pictures with undo option */}
+              {isEditing && picturesToRemove.length > 0 && (
+                <div className="mt-4">
+                  <h3 className="text-sm font-medium text-gray-500 mb-2">Pictures to Remove:</h3>
+                  <div className="grid grid-cols-4 gap-2">
+                    {picturesToRemove.map((picture, index) => {
+                      const fullImageUrl = getImageUrl(picture)
+                      return (
+                        <div key={`removed-${index}`} className="relative opacity-50">
+                          <img
+                            src={fullImageUrl}
+                            alt={`${staff.name} ${index + 1} (to remove)`}
+                            className="h-20 w-20 object-cover rounded border"
+                          />
+                          <button
+                            onClick={() => undoRemovePicture(picture)}
+                            className="absolute -top-2 -right-2 bg-green-500 text-white rounded-full p-1 hover:bg-green-600 transition-colors duration-200"
+                            title="Undo removal"
+                          >
+                            <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+                            </svg>
+                          </button>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
               )}
             </div>
           </div>

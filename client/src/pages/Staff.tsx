@@ -4,6 +4,7 @@ import { useForm } from 'react-hook-form'
 import { toast } from 'react-hot-toast'
 import { Plus, Edit, Trash2, Search, Users } from 'lucide-react'
 import { api } from '../services/api'
+import { getImageUrl } from '../config'
 import LoadingSpinner from '../components/LoadingSpinner'
 
 interface Staff {
@@ -28,6 +29,10 @@ export default function Staff() {
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingStaff, setEditingStaff] = useState<Staff | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
+  const [isBulkEditing, setIsBulkEditing] = useState(false)
+  const [selectedStaff, setSelectedStaff] = useState<number[]>([])
+  const [sortField, setSortField] = useState<keyof Staff>('createdAt')
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc')
   const queryClient = useQueryClient()
 
   const { data: staff = [], isLoading } = useQuery<Staff[]>(
@@ -75,6 +80,21 @@ export default function Staff() {
       onError: (error) => {
         toast.error(error instanceof Error ? error.message : 'Failed to delete staff member')
       },
+    }
+  )
+
+  const bulkStatusMutation = useMutation(
+    (data: { ids: number[]; status: string }) => api.put('/staff/bulk-status', data),
+    {
+      onSuccess: () => {
+        queryClient.invalidateQueries(['staff'])
+        toast.success('Staff status updated successfully')
+        setSelectedStaff([])
+        setIsBulkEditing(false)
+      },
+      onError: (error: any) => {
+        toast.error(error.message || 'Failed to update staff status')
+      }
     }
   )
 
@@ -151,6 +171,58 @@ export default function Staff() {
     }
   }
 
+  const handleSort = (field: keyof Staff) => {
+    if (sortField === field) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')
+    } else {
+      setSortField(field)
+      setSortDirection('asc')
+    }
+  }
+
+  const handleSelectAll = () => {
+    if (selectedStaff.length === staff.length) {
+      setSelectedStaff([])
+    } else {
+      setSelectedStaff(staff.map(s => s.id))
+    }
+  }
+
+  const handleSelectStaff = (id: number) => {
+    setSelectedStaff(prev => 
+      prev.includes(id) 
+        ? prev.filter(staffId => staffId !== id)
+        : [...prev, id]
+    )
+  }
+
+  const handleBulkStatusUpdate = (status: string) => {
+    if (selectedStaff.length === 0) return
+    
+    if (window.confirm(`Are you sure you want to set ${selectedStaff.length} staff member(s) to ${status}?`)) {
+      bulkStatusMutation.mutate({ ids: selectedStaff, status })
+    }
+  }
+
+  const sortedStaff = [...staff].sort((a, b) => {
+    const aValue = a[sortField]
+    const bValue = b[sortField]
+    
+    if (typeof aValue === 'string' && typeof bValue === 'string') {
+      return sortDirection === 'asc' 
+        ? aValue.localeCompare(bValue)
+        : bValue.localeCompare(aValue)
+    }
+    
+    if (aValue instanceof Date && bValue instanceof Date) {
+      return sortDirection === 'asc' 
+        ? aValue.getTime() - bValue.getTime()
+        : bValue.getTime() - aValue.getTime()
+    }
+    
+    return 0
+  })
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -161,28 +233,70 @@ export default function Staff() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold text-gray-900">Staff</h1>
-        <button
-          onClick={handleCreate}
-          className="btn btn-primary flex items-center gap-2"
-        >
-          <Plus className="h-4 w-4" />
-          Add Staff Member
-        </button>
-      </div>
+      {/* Header */}
+      <div className="mb-8">
+        <div className="flex items-center justify-between mb-4">
+          <h1 className="text-3xl font-bold text-gray-900">Staff</h1>
+          <div className="flex space-x-3">
+            {isBulkEditing && selectedStaff.length > 0 && (
+              <>
+                <button
+                  onClick={() => handleBulkStatusUpdate('active')}
+                  disabled={bulkStatusMutation.isLoading}
+                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-colors duration-200 disabled:opacity-50"
+                >
+                  Set Active ({selectedStaff.length})
+                </button>
+                <button
+                  onClick={() => handleBulkStatusUpdate('inactive')}
+                  disabled={bulkStatusMutation.isLoading}
+                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors duration-200 disabled:opacity-50"
+                >
+                  Set Inactive ({selectedStaff.length})
+                </button>
+                <button
+                  onClick={() => {
+                    setIsBulkEditing(false)
+                    setSelectedStaff([])
+                  }}
+                  className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-200 shadow-sm"
+                >
+                  Cancel Bulk Edit
+                </button>
+              </>
+            )}
+            {!isBulkEditing && (
+              <>
+                <button
+                  onClick={() => setIsBulkEditing(true)}
+                  className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-200 shadow-sm"
+                >
+                  Bulk Edit
+                </button>
+                <button
+                  onClick={handleCreate}
+                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-200"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Staff Member
+                </button>
+              </>
+            )}
+          </div>
+        </div>
 
-      {/* Search */}
-      <div className="card p-4">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-          <input
-            type="text"
-            placeholder="Search staff by name or ID..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="input pl-10"
-          />
+        {/* Search */}
+        <div className="card p-4">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+            <input
+              type="text"
+              placeholder="Search staff by name or ID..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="input pl-10"
+            />
+          </div>
         </div>
       </div>
 
@@ -192,55 +306,115 @@ export default function Staff() {
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  ID
+                {isBulkEditing && (
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <input
+                      type="checkbox"
+                      checked={selectedStaff.length === staff.length && staff.length > 0}
+                      onChange={handleSelectAll}
+                      className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    />
+                  </th>
+                )}
+                <th 
+                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                  onClick={() => handleSort('id')}
+                >
+                  <div className="flex items-center space-x-1">
+                    <span>ID</span>
+                    {sortField === 'id' && (
+                      <span className="text-blue-600">
+                        {sortDirection === 'asc' ? '↑' : '↓'}
+                      </span>
+                    )}
+                  </div>
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Pictures
+                  Picture
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Name
+                <th 
+                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                  onClick={() => handleSort('name')}
+                >
+                  <div className="flex items-center space-x-1">
+                    <span>Name</span>
+                    {sortField === 'name' && (
+                      <span className="text-blue-600">
+                        {sortDirection === 'asc' ? '↑' : '↓'}
+                      </span>
+                    )}
+                  </div>
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Staff ID
+                <th 
+                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                  onClick={() => handleSort('staffId')}
+                >
+                  <div className="flex items-center space-x-1">
+                    <span>Staff ID</span>
+                    {sortField === 'staffId' && (
+                      <span className="text-blue-600">
+                        {sortDirection === 'asc' ? '↑' : '↓'}
+                      </span>
+                    )}
+                  </div>
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Status
+                <th 
+                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                  onClick={() => handleSort('status')}
+                >
+                  <div className="flex items-center space-x-1">
+                    <span>Status</span>
+                    {sortField === 'status' && (
+                      <span className="text-blue-600">
+                        {sortDirection === 'asc' ? '↑' : '↓'}
+                      </span>
+                    )}
+                  </div>
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Remarks
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Created
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Actions
+                <th 
+                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                  onClick={() => handleSort('createdAt')}
+                >
+                  <div className="flex items-center space-x-1">
+                    <span>Created</span>
+                    {sortField === 'createdAt' && (
+                      <span className="text-blue-600">
+                        {sortDirection === 'asc' ? '↑' : '↓'}
+                      </span>
+                    )}
+                  </div>
                 </th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {staff.map((staffMember) => (
+              {sortedStaff.map((staffMember) => (
                 <tr key={staffMember.id} className="cursor-pointer hover:bg-gray-50" onClick={() => handleStaffClick(staffMember)}>
+                  {isBulkEditing && (
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <input
+                        type="checkbox"
+                        checked={selectedStaff.includes(staffMember.id)}
+                        onChange={(e) => {
+                          e.stopPropagation()
+                          handleSelectStaff(staffMember.id)
+                        }}
+                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      />
+                    </td>
+                  )}
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm text-gray-900 font-mono">{staffMember.id}</div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     {staffMember.pictures && staffMember.pictures.length > 0 ? (
-                      <div className="flex space-x-1">
-                        {staffMember.pictures.slice(0, 3).map((picture, index) => (
-                          <img 
-                            key={index}
-                            src={picture} 
-                            alt={`${staffMember.name} ${index + 1}`}
-                            className="h-12 w-12 rounded-full object-cover border-2 border-gray-200"
-                          />
-                        ))}
-                        {staffMember.pictures.length > 3 && (
-                          <div className="h-12 w-12 rounded-full bg-gray-200 flex items-center justify-center">
-                            <span className="text-gray-500 text-xs">+{staffMember.pictures.length - 3}</span>
-                          </div>
-                        )}
-                      </div>
+                      <img 
+                        src={getImageUrl(staffMember.pictures[0])}
+                        alt={`${staffMember.name}`}
+                        className="h-12 w-12 rounded-full object-cover border-2 border-gray-200"
+                      />
                     ) : (
                       <div className="h-12 w-12 rounded-full bg-gray-200 flex items-center justify-center">
                         <span className="text-gray-500 text-sm">No Pic</span>
@@ -269,19 +443,6 @@ export default function Staff() {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                     {new Date(staffMember.createdAt).toLocaleDateString()}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDelete(staffMember.id);
-                      }}
-                      disabled
-                      className="text-gray-400 cursor-not-allowed"
-                      title="Delete functionality is disabled"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
                   </td>
                 </tr>
               ))}
